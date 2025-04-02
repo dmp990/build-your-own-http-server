@@ -51,10 +51,10 @@ def get_response(path):
         body = msg
         content_length = len(body.encode())
         headers = (
-            "Content-Type: text/plain"  + CRLF + f"Content-Length: {content_length}" + CRLF + CRLF
+            "Content-Type: text/plain"  + CRLF + f"Content-Length: {content_length}" + CRLF
         )
         endpoint = endpoints.get("/echo/")
-        status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF + CRLF
+        status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF
         return (status_line + headers + body + CRLF + CRLF).encode()
     
     endpoint = endpoints.get(path)
