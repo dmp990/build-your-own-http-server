@@ -7,8 +7,12 @@ def main():
 
     # Uncomment this to pass the first stage
     #
-    server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
-    server_socket.accept() # wait for client
+    server_socket = socket.create_server(("localhost", 4221), reuse_port=False) # CHANGE REUSEPORT TO TRUE BEFORE SUBMISSION
+    conn, addr = server_socket.accept() # wait for client
+
+    print(f"Connected by {addr}")
+    message = "HTTP/1.1 200 OK\r\n\r\n"
+    conn.send(message.encode())
 
 
 if __name__ == "__main__":
