@@ -48,15 +48,21 @@ def recv_and_parse_request(conn, bufsize=1024):
 def get_response(path):
     if path.startswith("/echo/"):
         msg = path[len("/echo/") :]
+        body = msg
+        content_length = len(body.encode())
+        headers = (
+            "Content-Type: text/plain"  + CRLF + f"Content-Length: {content_length}" + CRLF + CRLF
+        )
         endpoint = endpoints.get("/echo/")
-    else:
-        endpoint = endpoints.get(path)
-        msg = ""
+        status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF + CRLF
+        return (status_line + headers + body + CRLF + CRLF).encode()
+    
+    endpoint = endpoints.get(path)
     if endpoint:
         return (
             endpoint["response_status_line"]
             + endpoint.get("response_headers", "")
-            + msg + CRLF + CRLF
+            + CRLF + CRLF
         ).encode()
 
     message = "HTTP/1.1 " + response_status_to_text["404"] + CRLF + CRLF
