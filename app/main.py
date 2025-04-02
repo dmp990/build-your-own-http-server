@@ -51,11 +51,12 @@ def get_response(path):
         endpoint = endpoints.get("/echo/")
     else:
         endpoint = endpoints.get(path)
+        msg = ""
     if endpoint:
         return (
             endpoint["response_status_line"]
             + endpoint.get("response_headers", "")
-            + msg
+            + msg + CRLF + CRLF
         ).encode()
 
     message = "HTTP/1.1 " + response_status_to_text["404"] + CRLF + CRLF
