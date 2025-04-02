@@ -2,9 +2,11 @@ import socket  # noqa: F401
 
 CRLF = "\r\n"
 
-response_statuses = {
-    "OK": "200 OK",
-    "NOT FOUND": "404 NOT FOUND"
+# Mapping of response status code to 'status_code status_text'
+# e.g. 200 -> 200 OK
+response_status_to_text = {
+    "200": "200 OK",
+    "404": "404 Not Found"
 }
 
 def main():
@@ -23,9 +25,9 @@ def main():
 
     message = "HTTP/1.1 "
     if requested_resource == "/":
-        message += response_statuses["OK"]
+        message += response_status_to_text["200"]
     else:
-        message += response_statuses["NOT FOUND"]
+        message += response_status_to_text["404"]
 
     message += CRLF + CRLF
     conn.send(message.encode())
