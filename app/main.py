@@ -37,32 +37,58 @@ endpoints = {
 
 def recv_and_parse_request(conn, bufsize=1024):
     data = conn.recv(bufsize)
-    first_line = data.decode("utf-8").split(CRLF)[0]
+    splitted = data.decode("utf-8").split(CRLF)
 
+    first_line = splitted[0]
     method, path, http_version = first_line.split(" ")
-    print(method, path, http_version)
 
-    return method, path, http_version
+    # Get headers
+    headers = {}
+    for line in splitted[1:]:
+        if line == "":
+            break
+        key, value = line.split(":", 1)
+        headers[key] = value.strip()
+
+    return method, path, http_version, headers
 
 
-def get_response(path):
+def get_response(path, headers):
     if path.startswith("/echo/"):
         msg = path[len("/echo/") :]
         body = msg
         content_length = len(body.encode())
-        headers = (
-            "Content-Type: text/plain"  + CRLF + f"Content-Length: {content_length}" + CRLF + CRLF
+        response_headers = (
+            "Content-Type: text/plain"
+            + CRLF
+            + f"Content-Length: {content_length}"
+            + CRLF
+            + CRLF
         )
         endpoint = endpoints.get("/echo/")
         status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF
-        return (status_line + headers + body + CRLF).encode()
-    
+        return (status_line + response_headers + body + CRLF).encode()
+
+    if path == "/user-agent":
+        content_length = len(headers.get("User-Agent", "").encode())
+        response_headers = (
+            "Content-Type: text/plain"
+            + CRLF
+            + f"Content-Length: {content_length}"
+            + CRLF
+            + CRLF
+        )
+        body = headers.get("User-Agent", "")
+        status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF
+        return (status_line + response_headers + body + CRLF).encode()
+
     endpoint = endpoints.get(path)
     if endpoint:
         return (
             endpoint["response_status_line"]
             + endpoint.get("response_headers", "")
-            + CRLF + CRLF
+            + CRLF
+            + CRLF
         ).encode()
 
     message = "HTTP/1.1 " + response_status_to_text["404"] + CRLF + CRLF
@@ -86,9 +112,11 @@ def main():
             conn, addr = server_socket.accept()  # wait for client
             print(f"Connected by {addr}")
 
-            method, path, http_version = recv_and_parse_request(conn)
+            method, path, http_version, headers = recv_and_parse_request(conn)
 
-            response = get_response(path)
+            print(f"Headers={headers}")
+
+            response = get_response(path, headers=headers)
 
             conn.send(response)
 
