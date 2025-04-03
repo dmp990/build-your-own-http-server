@@ -70,12 +70,15 @@ def get_response(path, method, headers, directory, body):
     if path.startswith("/echo/") and method == "GET":
         msg = path[len("/echo/") :]
         body = msg
+        hdr_accept_encoding = headers.get("Accept-Encoding", "")
+        gzip_supported = "gzip" in hdr_accept_encoding
         content_length = len(body.encode())
         response_headers = (
             "Content-Type: text/plain"
             + CRLF
             + f"Content-Length: {content_length}"
             + CRLF
+            + ("Content-Encoding: gzip" + CRLF if gzip_supported else "")
             + CRLF
         )
         endpoint = endpoints.get("/echo/")
