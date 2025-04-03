@@ -2,6 +2,8 @@ import socket  # noqa: F401
 import threading
 import os
 import sys
+import gzip
+import io
 
 HTTP_VER = "HTTP/1.1"
 CRLF = "\r\n"
@@ -41,6 +43,12 @@ endpoints = {
     },
 }
 
+def gzip_compress_string(input_string):
+    out = io.BytesIO()
+    with gzip.GzipFile(fileobj=out, mode='wb') as f:
+        f.write(input_string.encode('utf-8'))
+    return out.getvalue()
+
 
 def recv_and_parse_request(conn, bufsize=1024):
     data = conn.recv(bufsize)
@@ -72,7 +80,11 @@ def get_response(path, method, headers, directory, body):
         body = msg
         hdr_accept_encoding = headers.get("Accept-Encoding", "")
         gzip_supported = "gzip" in hdr_accept_encoding
-        content_length = len(body.encode())
+        if gzip_supported:
+            body = gzip_compress_string(msg)
+        else:
+            body = body.encode()
+        content_length = len(body)
         response_headers = (
             "Content-Type: text/plain"
             + CRLF
@@ -83,7 +95,7 @@ def get_response(path, method, headers, directory, body):
         )
         endpoint = endpoints.get("/echo/")
         status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF
-        return (status_line + response_headers + body + CRLF).encode()
+        return (status_line + response_headers).encode() + body
 
     if path == "/user-agent" and method == "GET":
         content_length = len(headers.get("User-Agent", "").encode())
