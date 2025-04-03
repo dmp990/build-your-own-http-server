@@ -9,7 +9,11 @@ SP = " "
 
 # Mapping of response status code to 'status_code status_text'
 # e.g. 200 -> 200 OK
-response_status_to_text = {"200": "200 OK", "404": "404 Not Found"}
+response_status_to_text = {
+    "200": "200 OK",
+    "404": "404 Not Found",
+    "201": "201 Created",
+}
 
 endpoints = {
     "/": {
@@ -47,17 +51,23 @@ def recv_and_parse_request(conn, bufsize=1024):
 
     # Get headers
     headers = {}
+    body = ""
+    is_body = False
     for line in splitted[1:]:
         if line == "":
-            break
-        key, value = line.split(":", 1)
-        headers[key] = value.strip()
+            is_body = True
+            continue
+        if is_body:
+            body += line
+        else:
+            key, value = line.split(":", 1)
+            headers[key] = value.strip()
 
-    return method, path, http_version, headers
+    return method, path, http_version, headers, body
 
 
-def get_response(path, headers, directory):
-    if path.startswith("/echo/"):
+def get_response(path, method, headers, directory, body):
+    if path.startswith("/echo/") and method == "GET":
         msg = path[len("/echo/") :]
         body = msg
         content_length = len(body.encode())
@@ -72,7 +82,7 @@ def get_response(path, headers, directory):
         status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF
         return (status_line + response_headers + body + CRLF).encode()
 
-    if path == "/user-agent":
+    if path == "/user-agent" and method == "GET":
         content_length = len(headers.get("User-Agent", "").encode())
         response_headers = (
             "Content-Type: text/plain"
@@ -91,6 +101,7 @@ def get_response(path, headers, directory):
 
         # print("Filename:", filename)
 
+        # TODO
         if not directory.strip():
             pass
         if not filename.strip():
@@ -98,26 +109,47 @@ def get_response(path, headers, directory):
 
         full_path = os.path.join(directory, filename)
         # print("Full path:", full_path, "Does it exist?", os.path.exists(full_path))
-        
+
         # If file exists
-        if os.path.exists(full_path):
-            with open(full_path, "rb") as f:
-                content = f.read()
-                status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF
-                content_length = len(content)
-                response_headers = (
-                    "Content-Type: application/octet-stream"
-                    + CRLF
-                    + f"Content-Length: {content_length}"
-                    + CRLF
-                    + CRLF
-                )
-                return (status_line + response_headers).encode() + content
-        else:
-            return ("HTTP/1.1 " + response_status_to_text["404"] + CRLF + CRLF).encode() # Respond with 404
+        if method == "GET":
+            if os.path.exists(full_path):
+                with open(full_path, "rb") as f:
+                    content = f.read()
+                    status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF
+                    content_length = len(content)
+                    response_headers = (
+                        "Content-Type: application/octet-stream"
+                        + CRLF
+                        + f"Content-Length: {content_length}"
+                        + CRLF
+                        + CRLF
+                    )
+                    return (status_line + response_headers).encode() + content
+
+            else:
+                return (
+                    "HTTP/1.1 " + response_status_to_text["404"] + CRLF + CRLF
+                ).encode()  # Respond with 404
+        elif method == "POST":
+            if not body:
+                pass #TODO
+
+            content_length_str = headers.get("Content-Length")
+            if content_length_str and content_length_str.isdigit():
+                content_length = int(content_length_str)
+            else:
+                content_length = 0
+            
+            # Ignore content length for now
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            with open(full_path, "wb") as f:
+                f.write(body.encode("utf-8"))
+
+            status_line = HTTP_VER + SP + response_status_to_text["201"] + CRLF + CRLF
+            return status_line.encode()
 
     endpoint = endpoints.get(path)
-    if endpoint:
+    if endpoint and method == "GET":
         return (
             endpoint["response_status_line"]
             + endpoint.get("response_headers", "")
@@ -125,6 +157,7 @@ def get_response(path, headers, directory):
             + CRLF
         ).encode()
 
+    # Return with 404 for all other requests
     message = "HTTP/1.1 " + response_status_to_text["404"] + CRLF + CRLF
     return message.encode()
 
@@ -132,9 +165,11 @@ def get_response(path, headers, directory):
 def handle_client(conn, addr, directory):
     print(f"Connected by {addr}")
 
-    method, path, http_version, headers = recv_and_parse_request(conn)
+    method, path, http_version, headers, body = recv_and_parse_request(conn)
 
-    response = get_response(path, headers=headers, directory=directory)
+    response = get_response(
+        path=path, method=method, headers=headers, directory=directory, body=body
+    )
 
     conn.send(response)
 
