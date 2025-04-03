@@ -130,7 +130,7 @@ def main():
 
             thread.start()
 
-            thread.join()
+            # thread.join()
 
     except KeyboardInterrupt:
         print("Keyboard interrupt. Shutting down server")
