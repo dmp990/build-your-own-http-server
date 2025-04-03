@@ -1,5 +1,7 @@
 import socket  # noqa: F401
 import threading
+import os
+import sys
 
 HTTP_VER = "HTTP/1.1"
 CRLF = "\r\n"
@@ -54,7 +56,7 @@ def recv_and_parse_request(conn, bufsize=1024):
     return method, path, http_version, headers
 
 
-def get_response(path, headers):
+def get_response(path, headers, directory):
     if path.startswith("/echo/"):
         msg = path[len("/echo/") :]
         body = msg
@@ -83,6 +85,37 @@ def get_response(path, headers):
         status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF
         return (status_line + response_headers + body + CRLF).encode()
 
+    if path.startswith("/files/"):
+        # print("handling /files")
+        filename = path[len("/files/") :]
+
+        # print("Filename:", filename)
+
+        if not directory.strip():
+            pass
+        if not filename.strip():
+            pass
+
+        full_path = os.path.join(directory, filename)
+        # print("Full path:", full_path, "Does it exist?", os.path.exists(full_path))
+        
+        # If file exists
+        if os.path.exists(full_path):
+            with open(full_path, "rb") as f:
+                content = f.read()
+                status_line = HTTP_VER + SP + response_status_to_text["200"] + CRLF
+                content_length = len(content)
+                response_headers = (
+                    "Content-Type: application/octet-stream"
+                    + CRLF
+                    + f"Content-Length: {content_length}"
+                    + CRLF
+                    + CRLF
+                )
+                return (status_line + response_headers).encode() + content
+        else:
+            return ("HTTP/1.1 " + response_status_to_text["404"] + CRLF + CRLF).encode() # Respond with 404
+
     endpoint = endpoints.get(path)
     if endpoint:
         return (
@@ -96,14 +129,12 @@ def get_response(path, headers):
     return message.encode()
 
 
-def handle_client(conn, addr):
+def handle_client(conn, addr, directory):
     print(f"Connected by {addr}")
 
     method, path, http_version, headers = recv_and_parse_request(conn)
 
-    print(f"Headers={headers}")
-
-    response = get_response(path, headers=headers)
+    response = get_response(path, headers=headers, directory=directory)
 
     conn.send(response)
 
@@ -114,9 +145,13 @@ def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!")
 
+    directory = None
+    if "--directory" in sys.argv:
+        directory = sys.argv[sys.argv.index("--directory") + 1]
+
     # Uncomment this to pass the first stage
     #
-    URL, PORT = "localhost", 4221
+    URL, PORT = "0.0.0.0", 4221
     server_socket = socket.create_server(
         (URL, PORT), reuse_port=False
     )  # CHANGE REUSEPORT TO TRUE BEFORE SUBMISSION
@@ -126,7 +161,9 @@ def main():
             print(f"Server waiting on {URL}:{PORT}")
             conn, addr = server_socket.accept()  # wait for client
 
-            thread = threading.Thread(target=handle_client, args=(conn, addr))
+            thread = threading.Thread(
+                target=handle_client, args=(conn, addr, directory)
+            )
 
             thread.start()
 
@@ -137,6 +174,7 @@ def main():
     finally:
         server_socket.close()
         print("Server socket closed.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
