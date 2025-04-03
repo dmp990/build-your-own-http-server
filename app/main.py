@@ -1,4 +1,5 @@
 import socket  # noqa: F401
+import threading
 
 HTTP_VER = "HTTP/1.1"
 CRLF = "\r\n"
@@ -95,6 +96,20 @@ def get_response(path, headers):
     return message.encode()
 
 
+def handle_client(conn, addr):
+    print(f"Connected by {addr}")
+
+    method, path, http_version, headers = recv_and_parse_request(conn)
+
+    print(f"Headers={headers}")
+
+    response = get_response(path, headers=headers)
+
+    conn.send(response)
+
+    conn.close()
+
+
 def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!")
@@ -110,17 +125,13 @@ def main():
         while True:
             print(f"Server waiting on {URL}:{PORT}")
             conn, addr = server_socket.accept()  # wait for client
-            print(f"Connected by {addr}")
 
-            method, path, http_version, headers = recv_and_parse_request(conn)
+            thread = threading.Thread(target=handle_client, args=(conn, addr))
 
-            print(f"Headers={headers}")
+            thread.start()
 
-            response = get_response(path, headers=headers)
+            thread.join()
 
-            conn.send(response)
-
-            conn.close()
     except KeyboardInterrupt:
         print("Keyboard interrupt. Shutting down server")
     finally:
